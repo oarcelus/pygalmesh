@@ -1,6 +1,7 @@
 #define CGAL_MESH_3_VERBOSE 1
 
 #include "generate_from_inr.hpp"
+#include "read_polylines.h"
 
 #include <cassert>
 
@@ -19,7 +20,8 @@ namespace pygalmesh {
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 
-typedef CGAL::Labeled_mesh_domain_3<K> Mesh_domain;
+typedef CGAL::Labeled_mesh_domain_3<K> Image_domain;
+typedef CGAL::Mesh_domain_with_polyline_features_3<Image_domain> Mesh_domain;
 
 // Triangulation
 typedef CGAL::Mesh_triangulation_3<Mesh_domain>::type Tr;
@@ -175,4 +177,94 @@ generate_from_inr_with_subdomain_sizing(
   return;
 }
 
+void
+generate_from_inr_feature_input(
+    const std::string & inr_filename,
+    const std::string & feature_filename,
+    const std::string & outfile,
+    const bool lloyd,
+    const bool odt,
+    const bool perturb,
+    const bool exude,
+    const double max_edge_size_at_feature_edges,
+    const double min_facet_angle,
+    const double max_radius_surface_delaunay_ball,
+    const double max_facet_distance,
+    const double max_circumradius_edge_ratio,
+    const double max_cell_circumradius,
+    const double exude_time_limit,
+    const double exude_sliver_bound,
+    const bool verbose,
+    const int seed
+    )
+{
+  CGAL::get_default_random() = CGAL::Random(seed);
+
+  CGAL::Image_3 image;
+  const bool success = image.read(inr_filename.c_str());
+  if (!success) {
+    throw "Could not read image file";
+  }
+
+  const std::string lines_fname = CGAL::data_file_path(feature_filename);
+  using Point_3 = K::Point_3;
+  std::vector<std::vector<Point_3>> features_inside;
+
+  if (!read_polylines(lines_fname, features_inside)) // see file "read_polylines.h"
+  {
+    std::cerr << "Error: Cannot read file " << lines_fname << std::endl;
+  }
+
+  Mesh_domain cgal_domain =
+    Mesh_domain::create_labeled_image_mesh_domain(image, CGAL::parameters::input_features = std::cref(features_inside));
+
+  CGAL::Bbox_3 bbox = cgal_domain.bbox();
+  double diag = CGAL::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
+                           CGAL::square(bbox.ymax() - bbox.ymin()) +
+                           CGAL::square(bbox.zmax() - bbox.zmin()));
+
+  double sizing;
+  if (max_edge_size_at_feature_edges < 0.001) {
+    sizing = diag * 0.05;
+  } else {
+    sizing = max_edge_size_at_feature_edges;
+  }
+
+  Mesh_criteria criteria(
+      CGAL::parameters::edge_size=sizing,
+      CGAL::parameters::facet_angle=min_facet_angle,
+      CGAL::parameters::facet_size=max_radius_surface_delaunay_ball,
+      CGAL::parameters::facet_distance=max_facet_distance,
+      CGAL::parameters::cell_radius_edge_ratio=max_circumradius_edge_ratio,
+      CGAL::parameters::cell_size=max_cell_circumradius
+      );
+
+  // Mesh generation
+  if (!verbose) {
+    // suppress output
+    std::cerr.setstate(std::ios_base::failbit);
+  }
+  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(
+      cgal_domain,
+      criteria,
+      lloyd ? CGAL::parameters::lloyd(CGAL::parameters::time_limit(0)) : CGAL::parameters::no_lloyd(),
+      odt ? CGAL::parameters::odt(CGAL::parameters::time_limit(0)) : CGAL::parameters::no_odt(),
+      perturb ? CGAL::parameters::perturb() : CGAL::parameters::no_perturb(),
+      exude ?
+        CGAL::parameters::exude(
+          CGAL::parameters::time_limit = exude_time_limit,
+          CGAL::parameters::sliver_bound = exude_sliver_bound
+        ) :
+        CGAL::parameters::no_exude()
+      );
+  if (!verbose) {
+    std::cerr.clear();
+  }
+
+  // Output
+  std::ofstream medit_file(outfile);
+  c3t3.output_to_medit(medit_file);
+  medit_file.close();
+  return;
+}
 } // namespace pygalmesh

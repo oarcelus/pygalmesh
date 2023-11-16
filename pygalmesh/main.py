@@ -12,6 +12,7 @@ from _pygalmesh import (
     _generate_2d,
     _generate_from_inr,
     _generate_from_inr_with_subdomain_sizing,
+    _generate_from_inr_feature_input,
     _generate_from_off,
     _generate_mesh,
     _generate_periodic_mesh,
@@ -291,6 +292,7 @@ def generate_volume_mesh_from_surface_mesh(
 
 def generate_from_inr(
     inr_filename: str,
+    feature_filename: str = None,
     lloyd: bool = False,
     odt: bool = False,
     perturb: bool = True,
@@ -309,58 +311,83 @@ def generate_from_inr(
     fh, outfile = tempfile.mkstemp(suffix=".mesh")
     os.close(fh)
 
-    if isinstance(max_cell_circumradius, float):
-        _generate_from_inr(
-            inr_filename,
-            outfile,
-            lloyd=lloyd,
-            odt=odt,
-            perturb=perturb,
-            exude=exude,
-            max_edge_size_at_feature_edges=max_edge_size_at_feature_edges,
-            min_facet_angle=min_facet_angle,
-            max_radius_surface_delaunay_ball=max_radius_surface_delaunay_ball,
-            max_facet_distance=max_facet_distance,
-            max_circumradius_edge_ratio=max_circumradius_edge_ratio,
-            max_cell_circumradius=max_cell_circumradius,
-            exude_time_limit=exude_time_limit,
-            exude_sliver_bound=exude_sliver_bound,
-            verbose=verbose,
-            seed=seed,
-        )
-    else:
-        assert isinstance(max_cell_circumradius, dict)
-        if "default" in max_cell_circumradius.keys():
-            default_max_cell_circumradius = max_cell_circumradius.pop("default")
+    if feature_filename is None:
+        if isinstance(max_cell_circumradius, float):
+            _generate_from_inr(
+                inr_filename,
+                outfile,
+                lloyd=lloyd,
+                odt=odt,
+                perturb=perturb,
+                exude=exude,
+                max_edge_size_at_feature_edges=max_edge_size_at_feature_edges,
+                min_facet_angle=min_facet_angle,
+                max_radius_surface_delaunay_ball=max_radius_surface_delaunay_ball,
+                max_facet_distance=max_facet_distance,
+                max_circumradius_edge_ratio=max_circumradius_edge_ratio,
+                max_cell_circumradius=max_cell_circumradius,
+                exude_time_limit=exude_time_limit,
+                exude_sliver_bound=exude_sliver_bound,
+                verbose=verbose,
+                seed=seed,
+            )
         else:
-            default_max_cell_circumradius = 0.0
+            assert isinstance(max_cell_circumradius, dict)
+            if "default" in max_cell_circumradius.keys():
+                default_max_cell_circumradius = max_cell_circumradius.pop("default")
+            else:
+                default_max_cell_circumradius = 0.0
 
-        max_cell_circumradiuss = list(max_cell_circumradius.values())
-        subdomain_labels = list(max_cell_circumradius.keys())
+            max_cell_circumradiuss = list(max_cell_circumradius.values())
+            subdomain_labels = list(max_cell_circumradius.keys())
 
-        _generate_from_inr_with_subdomain_sizing(
-            inr_filename,
-            outfile,
-            default_max_cell_circumradius,
-            max_cell_circumradiuss,
-            subdomain_labels,
-            lloyd=lloyd,
-            odt=odt,
-            perturb=perturb,
-            exude=exude,
-            max_edge_size_at_feature_edges=max_edge_size_at_feature_edges,
-            min_facet_angle=min_facet_angle,
-            max_radius_surface_delaunay_ball=max_radius_surface_delaunay_ball,
-            max_facet_distance=max_facet_distance,
-            max_circumradius_edge_ratio=max_circumradius_edge_ratio,
-            verbose=verbose,
-            seed=seed,
-        )
+            _generate_from_inr_with_subdomain_sizing(
+                inr_filename,
+                outfile,
+                default_max_cell_circumradius,
+                max_cell_circumradiuss,
+                subdomain_labels,
+                lloyd=lloyd,
+                odt=odt,
+                perturb=perturb,
+                exude=exude,
+                max_edge_size_at_feature_edges=max_edge_size_at_feature_edges,
+                min_facet_angle=min_facet_angle,
+                max_radius_surface_delaunay_ball=max_radius_surface_delaunay_ball,
+                max_facet_distance=max_facet_distance,
+                max_circumradius_edge_ratio=max_circumradius_edge_ratio,
+                verbose=verbose,
+                seed=seed,
+            )
 
+    else:
+        if isinstance(max_cell_circumradius, float):
+            _generate_from_inr_feature_input(
+                inr_filename,
+                feature_filename=feature_filename,
+                outfile=outfile,
+                lloyd=lloyd,
+                odt=odt,
+                perturb=perturb,
+                exude=exude,
+                max_edge_size_at_feature_edges=max_edge_size_at_feature_edges,
+                min_facet_angle=min_facet_angle,
+                max_radius_surface_delaunay_ball=max_radius_surface_delaunay_ball,
+                max_facet_distance=max_facet_distance,
+                max_circumradius_edge_ratio=max_circumradius_edge_ratio,
+                max_cell_circumradius=max_cell_circumradius,
+                exude_time_limit=exude_time_limit,
+                exude_sliver_bound=exude_sliver_bound,
+                verbose=verbose,
+                seed=seed,
+            )
+        
+        else:
+            raise ValueError("max_cell_circumradius must be a float")
+    
     mesh = meshio.read(outfile)
     os.remove(outfile)
     return mesh
-
 
 def remesh_surface(
     filename: str,
@@ -442,6 +469,7 @@ def save_inr(vol, voxel_size: tuple[float, float, float], fname: str):
 def generate_from_array(
     vol,
     voxel_size: tuple[float, float, float],
+    feature_filename: str = None,
     lloyd: bool = False,
     odt: bool = False,
     perturb: bool = True,
@@ -461,6 +489,7 @@ def generate_from_array(
     save_inr(vol, voxel_size, inr_filename)
     mesh = generate_from_inr(
         inr_filename,
+        feature_filename,
         lloyd,
         odt,
         perturb,
