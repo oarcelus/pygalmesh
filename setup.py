@@ -21,13 +21,10 @@ ext_modules = [
                 "src/pybind11.cpp",
             ]
         ),
-        include_dirs=[
-            os.environ.get("EIGEN_INCLUDE_DIR", "/usr/include/eigen3/"),
-            # macos/brew:
-            "/usr/local/include/eigen3",
-        ],
-        # no CGAL libraries necessary from CGAL 5.0 onwards
+        include_dirs=[os.environ.get("EIGEN_INCLUDE_DIR", "/usr/include/eigen3/"),
+                      ],
         libraries=["gmp", "mpfr"],
+        library_dirs=["C:/dev/vcpkg/installed/x64-windows-static/lib"]
     )
 ]
 

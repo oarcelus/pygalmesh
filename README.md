@@ -524,6 +524,81 @@ pip install -U pygalmesh
 
 you can install/upgrade.
 
+### Manual installation on Windows with vcpkg 
+
+On C:/ install vcpkg
+
+```
+mkdir dev
+cd dev
+git clone https://github.com/microsoft/vcpkg
+cd vcpkg
+.\bootstrap-vcpkg.bat
+```
+
+Install CGAL
+```
+vcpkg install gmp:x64-windows-static
+vcpkg install mpfr:x64-windows-static
+vcpkg install eigen3:x64-windows-static
+vcpkg install cgal:x64-windows-static
+```
+
+Clone Pygalmesh repository
+```
+git clone https://github.com/nschloe/pygalmesh.git
+```
+
+Change `setup.py` (look at the modified file):
+
+```python
+import os
+
+from pybind11.setup_helpers import Pybind11Extension, build_ext
+from setuptools import setup
+
+# https://github.com/pybind/python_example/
+ext_modules = [
+    Pybind11Extension(
+        "_pygalmesh",
+        # Sort input source files to ensure bit-for-bit reproducible builds
+        # (https://github.com/pybind/python_example/pull/53)
+        sorted(
+            [
+                "src/generate.cpp",
+                "src/generate_2d.cpp",
+                "src/generate_from_inr.cpp",
+                "src/generate_from_off.cpp",
+                "src/generate_periodic.cpp",
+                "src/generate_surface_mesh.cpp",
+                "src/remesh_surface.cpp",
+                "src/pybind11.cpp",
+            ]
+        ),
+        include_dirs=[os.environ.get("EIGEN_INCLUDE_DIR", "/usr/include/eigen3/"),
+                      ],
+        libraries=["gmp", "mpfr"],
+        library_dirs=["C:/dev/vcpkg/installed/x64-windows-static/lib"]
+    )
+]
+
+if __name__ == "__main__":
+    setup(
+        cmdclass={"build_ext": build_ext},
+        ext_modules=ext_modules,
+        zip_safe=False,
+    )
+
+```
+
+Install pygalmesh:
+```
+cd pygalmesh
+set EIGEN_INCLUDE_DIR=C:/dev/vcpkg/installed/x64-windows-static/include
+pip install .
+```
+
+
 #### Troubleshooting
 
 If pygalmesh fails to build due to `fatal error: 'Eigen/Dense' file not found`
